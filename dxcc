@@ -1,6 +1,9 @@
 #!/usr/bin/env perl -w
 
 # dxcc - determining the DXCC country of a callsign
+# modified by Kenji Rikitake, JJ1BDX.
+# See https://github.com/jj1bdx/dj1yfk-dxcc/ for the details.
+# (c) 2022 Kenji Rikitake, JJ1BDX
 #
 # Copyright (C) 2007-2019  Fabian Kurz, DJ1YFK
 #
