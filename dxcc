@@ -258,12 +258,18 @@ sub DxccGetRecord {
     my $zones = '';    # annoying zone exceptions
     my $goodzone;
     my $letter = '';
+    my @mydxcc = qw/Unknown 0 0 0 0 0 0 ?/;
 
-    if ( $fullcalls{$testcall} ) {    # direct match with "="
+    if ( $fullcalls{$testcall} ) {    # direct match with a fullcall
             # do nothing! don't try to resolve WPX, it's a full
             # call and will match correctly even if it contains a /
+        @mydxcc = $fullcalls{$testcall};
+        return @mydxcc;
     }
-    elsif ( $testcall =~ /(^OH\/)|(\/OH[1-9]?$)/ ) {    # non-Aland prefix!
+
+    # rewrite testcall with local rules
+
+    if ( $testcall =~ /(^OH\/)|(\/OH[1-9]?$)/ ) {    # non-Aland prefix!
         $testcall = "OH";    # make callsign OH = finland
     }
     elsif ( $testcall =~ /(^3D2R)|(^3D2.+\/R)/ ) {    # seems to be from Rotuma
@@ -282,6 +288,8 @@ sub DxccGetRecord {
           . "AA";                        # use the wpx prefix instead, which may
                                          # intentionally be wrong, see &wpx!
     }
+
+    ###########################################
 
     $letter = substr( $testcall, 0, 1 );
 
@@ -318,24 +326,11 @@ sub DxccGetRecord {
         }
     }
 
-    my @mydxcc;    # save typing work
-
     if ( defined( $dxcc{$matchprefix} ) ) {
         @mydxcc = @{ $dxcc{$matchprefix} };
     }
     else {
         @mydxcc = qw/Unknown 0 0 0 0 0 0 ?/;
-    }
-
-    # Different zones?
-
-    if ($goodzone) {
-        if ( $goodzone =~ /\((\d+)\)/ ) {    # CQ-Zone in ()
-            $mydxcc[1] = $1;
-        }
-        if ( $goodzone =~ /\[(\d+)\]/ ) {    # ITU-Zone in []
-            $mydxcc[2] = $1;
-        }
     }
 
  # cty.dat has special entries for WAE countries which are not separate DXCC
@@ -356,7 +351,7 @@ sub DxccGetRecord {
 
     return @mydxcc;
 
-}    # dxcc ends here
+}    # DxccGetRecord ends here
 
 sub DxccReadCty {
 
@@ -442,8 +437,8 @@ sub DxccReadCty {
                     }
                     print "\n";
                 }
-                else {                                 # "normal" prefix
-                    my $prefix = $word;
+                elsif ( $word =~ /^([A-Z0-9\/]+)/ ) {    # a "normal" prefix
+                    my $prefix = $1;
                     $prefixes{$prefix} = [@dxccval];
 
                     # debug
