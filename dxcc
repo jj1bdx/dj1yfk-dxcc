@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl -w
 
 # dxcc - determining the DXCC country of a callsign
 #
@@ -46,9 +46,9 @@ my $args = '';
 my $lidadditions = "^QRP\$|^LGT\$";
 my $csadditions  = "(^P\$)|(^M{1,2}\$)|(^AM\$)|(^A\$)";
 
-&read_cty();
+&DxccReadCty();
 
-if ( !$ARGV[0] || ( $ARGV[0] =~ /-[^mg]/ ) ) {
+if ( !$ARGV[0] ) {
     print "$credits
 
 Usage:  dxcc <callsign>\n\n";
@@ -60,7 +60,7 @@ else {
 }
 
 {
-    my @dxcc = &dxcc("\U$args");
+    my @dxcc = &DxccGetRecord("\U$args");
 
     print "Callsign: \U$args\n\n";
 
@@ -86,7 +86,7 @@ else {
 #
 ###############################################################################
 
-sub wpx {
+sub DxccWpx {
     my ( $prefix, $a, $b, $c );
 
   # First check if the call is in the proper format, A/B/C where A and C
@@ -217,7 +217,7 @@ sub wpx {
         return $prefix;
     }
     else { return ''; }    # no proper callsign received.
-}    # wpx ends here
+}    # DxccWpx ends here
 
 ##############################################################################
 #
@@ -249,8 +249,8 @@ sub wpx {
 #
 ###############################################################################
 
-sub dxcc {
-    my $testcall    = shift;
+sub DxccGetRecord {
+    my $testcall    = $_[0];
     my $matchchars  = 0;
     my $matchprefix = '';
     my $test;
@@ -277,7 +277,8 @@ sub dxcc {
     }
     elsif ( $testcall =~ /\w\/\w/ ) {    # check if the callsign has a "/"
         $testcall =
-          &wpx( $testcall, 1 ) . "AA";   # use the wpx prefix instead, which may
+          &DxccWpx( $testcall, 1 )
+          . "AA";                        # use the wpx prefix instead, which may
                                          # intentionally be wrong, see &wpx!
     }
 
@@ -350,20 +351,17 @@ sub dxcc {
         if ( $mydxcc[7] eq '*JW/b' ) { $mydxcc[7] = "JW" }   # Bear Island
     }
 
- # CTY.dat uses "/" in some DXCC names, but I prefer to remove them, for example
- # VP8/s ==> VP8s etc.
-
-    $mydxcc[7] =~ s/\///g;
+    # include "/" in the Main Prefix
 
     return @mydxcc;
 
 }    # dxcc ends here
 
-sub read_cty {
+sub DxccReadCty {
 
     # Read cty.dat from AD1C in
     # /usr/share/dxcc, /usr/local/share/dxcc, and current directory.
-    
+
     my $filename;
 
     if ( -e "/usr/share/dxcc/cty.dat" ) {
@@ -422,6 +420,6 @@ sub read_cty {
     }
     close CTY;
 
-}    # read_cty
+}    # ends DxccReadCty
 
 exit;
