@@ -12,6 +12,7 @@ install:
 	install -m 0644 dxcc.1		$(DESTDIR)/share/man/man1/
 	install -m 0644 earth.gif	$(DESTDIR)/share/dxcc/
 	install -m 0755 dxcc		$(DESTDIR)/bin/
+	install -m 0644 cty.dat 	$(DESTDIR)/share/dxcc/
 	
 uninstall:
 	rm -f $(DESTDIR)/bin/dxcc
