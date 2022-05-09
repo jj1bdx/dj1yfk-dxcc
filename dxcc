@@ -26,19 +26,24 @@ my $version   = 'VERSION';
 my $gui       = 0;
 my $earthfile = '';          # world map. location will be found later.
 my $splash    = "                    Please enter a callsign!";
-my $credits =
-  "dxcc $version (c) Fabian Kurz, DJ1YFK.  http://fkurz.net/ham/dxcc.html
+my $credits   = "dxcc modified by Kenji Rikitake, JJ1BDX.
+See https://github.com/jj1bdx/dj1yfk-dxcc/ for the details.
+(c) 2022 Kenji Rikitake, JJ1BDX 
+
+Originally from:
+dxcc 20191204 (c) Fabian Kurz, DJ1YFK.  http://fkurz.net/ham/dxcc.html
 
 Determines the ARRL DXCC entity of a ham radio callsign, based on the cty.dat
 country file by Jim Reisert, AD1C (http://country-files.com/). 
 
-This is free software, and you are welcome to redistribute it
-under certain conditions (see COPYING).";
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.";
 
-my %fullcalls;               # hash of full calls (=DL1XYZ)
-my %prefixes;                # hash of arrays  prefixes -> main prefix
-my %dxcc;                    # hash of arrays  main prefix -> (CQZ, ITUZ, ...)
-my $mainprefix;
+my %fullcalls;    # hash of arrays  fullcalls -> dxcc data
+my %prefixes;     # hash of arrays  prefixes -> dxcc data
+my %dxcc;         # hash of arrays  main prefix -> (CQZ, ITUZ, ...)
 my @dxcc;
 
 my $args = '';
@@ -47,7 +52,6 @@ my $lidadditions = "^QRP\$|^LGT\$";
 my $csadditions  = "(^P\$)|(^M{1,2}\$)|(^AM\$)|(^A\$)";
 
 &DxccReadCty();
-exit;
 
 if ( !$ARGV[0] ) {
     print "$credits
@@ -241,6 +245,8 @@ sub DxccWpx {
 # Also some "unusual" callsigns which appear to be in wrong DXCCs will be
 # assigned properly this way, for example Antarctic-Callsigns.
 #
+# First this sub scans the fullcall list for exact matches, which handles the
+# special cases of the callsign.
 # Then the callsign (or what appears to be the part determining the DXCC if
 # there is a "/" in the callsign) will be checked against the list of prefixes
 # and the best matching one will be taken as DXCC.
@@ -255,15 +261,19 @@ sub DxccGetRecord {
     my $matchchars  = 0;
     my $matchprefix = '';
     my $test;
-    my $zones = '';    # annoying zone exceptions
-    my $goodzone;
     my $letter = '';
     my @mydxcc = qw/Unknown 0 0 0 0 0 0 ?/;
+
+    # debug
+    #print "testcall: $testcall\n";
 
     if ( $fullcalls{$testcall} ) {    # direct match with a fullcall
             # do nothing! don't try to resolve WPX, it's a full
             # call and will match correctly even if it contains a /
-        @mydxcc = $fullcalls{$testcall};
+        @mydxcc = @{ $fullcalls{$testcall} };
+
+        # debug
+        #print "testcall is a fullcall\n";
         return @mydxcc;
     }
 
@@ -289,48 +299,33 @@ sub DxccGetRecord {
                                          # intentionally be wrong, see &wpx!
     }
 
-    ###########################################
+    # debug
+    #print "testcall is rewritten as: $testcall\n";
 
+    # pick the top letter
     $letter = substr( $testcall, 0, 1 );
 
-    foreach $mainprefix ( keys %prefixes ) {
+    # Test for all the prefixes
+    for my $testprefix ( keys %prefixes ) {
+        my $len = length($testprefix);
+        if ( $letter ne substr( $testprefix, 0, 1 ) ) {    # gains 20% speed
+            next;
+        }
+        $testprefix =~ /^([A-Z0-9\/]+)/;
+        $len = length($1);
+        if ( substr( $testcall, 0, $len ) eq substr( $testprefix, 0, $len )
+            && ( $matchchars <= $len ) )
+        {
+            $matchchars  = $len;
+            $matchprefix = $testprefix;
 
-        foreach $test ( @{ $prefixes{$mainprefix} } ) {
-            my $len = length($test);
-
-            if ( $letter ne substr( $test, 0, 1 ) ) {    # gains 20% speed
-                next;
-            }
-
-            $zones = '';
-
-            if (
-                ( $len > 5 ) && (
-                    ( index( $test, '(' ) > -1 )    # extra zones
-                    || ( index( $test, '[' ) > -1 )
-                )
-              )
-            {
-                $test =~ /^([A-Z0-9\/]+)([\[\(].+)/;
-                $zones .= $2 if defined $2;
-                $len = length($1);
-            }
-
-            if (   ( substr( $testcall, 0, $len ) eq substr( $test, 0, $len ) )
-                && ( $matchchars <= $len ) )
-            {
-                $matchchars  = $len;
-                $matchprefix = $mainprefix;
-                $goodzone    = $zones;
-            }
+            # debug
+            #print "matched: $matchprefix length: $matchchars\n";
         }
     }
 
-    if ( defined( $dxcc{$matchprefix} ) ) {
-        @mydxcc = @{ $dxcc{$matchprefix} };
-    }
-    else {
-        @mydxcc = qw/Unknown 0 0 0 0 0 0 ?/;
+    if ( defined( $prefixes{$matchprefix} ) ) {
+        @mydxcc = @{ $prefixes{$matchprefix} };
     }
 
  # cty.dat has special entries for WAE countries which are not separate DXCC
@@ -381,17 +376,17 @@ sub DxccReadCty {
 
         if ( substr( $line, 0, 1 ) ne ' ' ) {    # New DXCC
             $line =~ /\s+([*A-Za-z0-9\/]+):\s+$/;
-            $mainprefix = $1;
+            my $mainprefix = $1;
             $line =~ s/\s{2,}//g;
             @lastdxcc = split( /:/, $line );
             $dxcc{$mainprefix} = [@lastdxcc];
 
             # debug
-            print "mainprefix: $mainprefix\n elements:";
-            for my $i ( @{ $dxcc{$mainprefix} } ) {
-                print " $i, ";
-            }
-            print "\n";
+            #print "mainprefix: $mainprefix\n elements:";
+            #for my $i ( @{ $dxcc{$mainprefix} } ) {
+            #    print " $i, ";
+            #}
+            #print "\n";
         }
         else {    # prefix-line
             $line =~ s/\s+//g;
@@ -401,52 +396,55 @@ sub DxccReadCty {
             my @words = split( /,|;/, $line );
 
             # debug
-            print "prefix-line of mainprefix: $mainprefix\n words:";
+            #print "prefix-line of mainprefix: $mainprefix\n words:";
+
             for my $word (@words) {
 
                 # debug
-                print "word: $word\n";
+                #print "word: $word\n";
+
                 my @dxccval = @lastdxcc;
 
                 # debug
-                print "dxccval elements:";
-                for my $i (@dxccval) {
-                    print " $i, ";
-                }
-                print "\n";
+                #print "dxccval elements:";
+                #for my $i (@dxccval) {
+                #    print " $i, ";
+                #}
+                #print "\n";
+
                 if ( $word =~ /\((\d+)\)/ ) {    # CQ-Zone in ()
                     $dxccval[1] = $1;
 
                     # debug
-                    print "new cq zone: $dxccval[1]\n";
+                    #print "new cq zone: $dxccval[1]\n";
                 }
                 if ( $word =~ /\[(\d+)\]/ ) {    # ITU-Zone in []
                     $dxccval[2] = $1;
 
                     # debug
-                    print "new itu zone: $dxccval[2]\n";
+                    #print "new itu zone: $dxccval[2]\n";
                 }
                 if ( $word =~ /^=([A-Z0-9\/]+)/ ) {    # a fullcall
                     my $fullcall = $1;
                     $fullcalls{$fullcall} = [@dxccval];
 
                     # debug
-                    print "new fullcall $fullcall\n elements:";
-                    for my $i ( @{ $fullcalls{$fullcall} } ) {
-                        print " $i, ";
-                    }
-                    print "\n";
+                    #print "new fullcall $fullcall\n elements:";
+                    #for my $i ( @{ $fullcalls{$fullcall} } ) {
+                    #    print " $i, ";
+                    #}
+                    #print "\n";
                 }
                 elsif ( $word =~ /^([A-Z0-9\/]+)/ ) {    # a "normal" prefix
                     my $prefix = $1;
                     $prefixes{$prefix} = [@dxccval];
 
                     # debug
-                    print "new prefix $prefix\n elements:";
-                    for my $i ( @{ $prefixes{$prefix} } ) {
-                        print " $i, ";
-                    }
-                    print "\n";
+                    #print "new prefix $prefix\n elements:";
+                    #for my $i ( @{ $prefixes{$prefix} } ) {
+                    #    print " $i, ";
+                    #}
+                    #print "\n";
                 }
             }
         }
