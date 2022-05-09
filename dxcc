@@ -36,7 +36,7 @@ This is free software, and you are welcome to redistribute it
 under certain conditions (see COPYING).";
 
 my %fullcalls;               # hash of full calls (=DL1XYZ)
-my %prefixes;                # hash of arrays  main prefix -> (all, prefixes,..)
+my %prefixes;                # hash of arrays  prefixes -> main prefix
 my %dxcc;                    # hash of arrays  main prefix -> (CQZ, ITUZ, ...)
 my $mainprefix;
 my @dxcc;
@@ -47,6 +47,7 @@ my $lidadditions = "^QRP\$|^LGT\$";
 my $csadditions  = "(^P\$)|(^M{1,2}\$)|(^AM\$)|(^A\$)";
 
 &DxccReadCty();
+exit;
 
 if ( !$ARGV[0] ) {
     print "$credits
@@ -379,43 +380,80 @@ sub DxccReadCty {
 
     open CTY, $filename;
 
+    my @lastdxcc;
+
     while ( my $line = <CTY> ) {
 
         if ( substr( $line, 0, 1 ) ne ' ' ) {    # New DXCC
             $line =~ /\s+([*A-Za-z0-9\/]+):\s+$/;
             $mainprefix = $1;
             $line =~ s/\s{2,}//g;
-            @{ $dxcc{$mainprefix} } = split( /:/, $line );
+            @lastdxcc = split( /:/, $line );
+            $dxcc{$mainprefix} = [@lastdxcc];
+
+            # debug
+            print "mainprefix: $mainprefix\n elements:";
+            for my $i ( @{ $dxcc{$mainprefix} } ) {
+                print " $i, ";
+            }
+            print "\n";
         }
-        else {                                   # prefix-line
+        else {    # prefix-line
             $line =~ s/\s+//g;
 
-            # read full calls into separate hash. this hash only
-            # contains the information that this is a full call and
-            # therefore doesn't need to be handled by &wpx even if
-            # it contains a slash
+            # split a line into words
+            # (fullcalls or prefixes with zone amendment data)
+            my @words = split( /,|;/, $line );
 
-            if ( $line =~ /=/ ) {
-                my @matches =
-                  ( $line =~ /=([A-Z0-9\/]+)(\(\d+\))?(\[\d+\])?[,;]/g );
-                foreach (@matches) {
-                    $fullcalls{$_} = 1;
+            # debug
+            print "prefix-line of mainprefix: $mainprefix\n words:";
+            for my $word (@words) {
+
+                # debug
+                print "word: $word\n";
+                my @dxccval = @lastdxcc;
+
+                # debug
+                print "dxccval elements:";
+                for my $i (@dxccval) {
+                    print " $i, ";
+                }
+                print "\n";
+                if ( $word =~ /\((\d+)\)/ ) {    # CQ-Zone in ()
+                    $dxccval[1] = $1;
+
+                    # debug
+                    print "new cq zone: $dxccval[1]\n";
+                }
+                if ( $word =~ /\[(\d+)\]/ ) {    # ITU-Zone in []
+                    $dxccval[2] = $1;
+
+                    # debug
+                    print "new itu zone: $dxccval[2]\n";
+                }
+                if ( $word =~ /^=([A-Z0-9\/]+)/ ) {    # a fullcall
+                    my $fullcall = $1;
+                    $fullcalls{$fullcall} = [@dxccval];
+
+                    # debug
+                    print "new fullcall $fullcall\n elements:";
+                    for my $i ( @{ $fullcalls{$fullcall} } ) {
+                        print " $i, ";
+                    }
+                    print "\n";
+                }
+                else {                                 # "normal" prefix
+                    my $prefix = $word;
+                    $prefixes{$prefix} = [@dxccval];
+
+                    # debug
+                    print "new prefix $prefix\n elements:";
+                    for my $i ( @{ $prefixes{$prefix} } ) {
+                        print " $i, ";
+                    }
+                    print "\n";
                 }
             }
-
-            # Continue with everything else. Including full calls, which will
-            # be read as normal prefixes.
-
-            $line =~ s/=//g;
-
-            # handle "normal" prefixes
-            unless ( defined( $prefixes{$mainprefix}[0] ) ) {
-                @{ $prefixes{$mainprefix} } = split( /,|;/, $line );
-            }
-            else {
-                push( @{ $prefixes{$mainprefix} }, split( /,|;/, $line ) );
-            }
-
         }
     }
     close CTY;
