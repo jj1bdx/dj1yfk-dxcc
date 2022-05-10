@@ -440,27 +440,33 @@ sub DxccReadCty {
                     # debug
                     #print "new itu zone: $dxccval[2]\n";
                 }
-                if ( $word =~ /^=([A-Z0-9\/]+)/ ) {    # a fullcall
-                    my $fullcall = $1;
-                    $fullcalls{$fullcall} = [@dxccval];
+                if ( $word =~ /=?([A-Z0-9\/]+)/ ) {
 
-                    # debug
-                    #print "new fullcall $fullcall\n elements:";
-                    #for my $i ( @{ $fullcalls{$fullcall} } ) {
-                    #    print " $i, ";
-                    #}
-                    #print "\n";
-                }
-                elsif ( $word =~ /^([A-Z0-9\/]+)/ ) {    # a "normal" prefix
-                    my $prefix = $1;
-                    $prefixes{$prefix} = [@dxccval];
+                    # callsign: fullcall or prefix
+                    my $callsign = $1;
+                    if ( substr( $word, 0, 1 ) eq '=' ) {
 
-                    # debug
-                    #print "new prefix $prefix\n elements:";
-                    #for my $i ( @{ $prefixes{$prefix} } ) {
-                    #    print " $i, ";
-                    #}
-                    #print "\n";
+                        # fullcall
+                        $fullcalls{$callsign} = [@dxccval];
+
+                        # debug
+                        #print "new fullcall $callsign\n elements:";
+                        #for my $i ( @{ $fullcalls{$callsign} } ) {
+                        #    print " $i, ";
+                        #}
+                        #print "\n";
+                    }
+                    else {
+                        # "normal" prefix
+                        $prefixes{$callsign} = [@dxccval];
+
+                        # debug
+                        #print "new prefix $callsign\n elements:";
+                        #for my $i ( @{ $prefixes{$callsign} } ) {
+                        #    print " $i, ";
+                        #}
+                        #print "\n";
+                    }
                 }
             }
         }
