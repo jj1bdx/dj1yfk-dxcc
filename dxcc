@@ -451,6 +451,13 @@ sub DxccReadCty {
                 }
                 if ( $word =~ /=?([A-Z0-9\/]+)/ ) {
 
+                    # convert value types
+                    $dxccval[1] = $dxccval[1] * 1;
+                    $dxccval[2] = $dxccval[2] * 1;
+                    $dxccval[4] = $dxccval[4] * 1.0;
+                    $dxccval[5] = $dxccval[5] * 1.0;
+                    $dxccval[6] = $dxccval[6] * 1.0;
+
                     # callsign: fullcall or prefix
                     my $callsign = $1;
                     if ( substr( $word, 0, 1 ) eq '=' ) {
