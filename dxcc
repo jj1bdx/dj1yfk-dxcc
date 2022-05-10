@@ -52,9 +52,6 @@ my @dxcc;
 
 my $args = '';
 
-my $lidadditions = "^QRP\$|^LGT\$";
-my $csadditions  = "(^P\$)|(^M{1,2}\$)|(^AM\$)|(^A\$)";
-
 &DxccReadCty();
 
 if ( !$ARGV[0] ) {
@@ -96,136 +93,142 @@ else {
 ###############################################################################
 
 sub DxccWpx {
-    my ( $prefix, $a, $b, $c );
+    my $prefix;
+    my $a;
+    my $b;
+    my $c;
+    my $call         = $_[0];
+    my $lidadditions = "^QRP\$|^LGT\$";
+    my $csadditions  = "(^P\$)|(^M{1,2}\$)|(^AM\$)|(^A\$)";
 
   # First check if the call is in the proper format, A/B/C where A and C
   # are optional (prefix of guest country and P, MM, AM etc) and B is the
   # callsign. Only letters, figures and "/" is accepted, no further check if the
   # callsign "makes sense".
-  # 23.Apr.06: Added another "/X" to the regex, for calls like RV0AL/0/P
-  # as used by RDA-DXpeditions....
 
-    if ( $_[0] =~
-        /^((\d|[A-Z])+\/)?((\d|[A-Z]){3,})(\/(\d|[A-Z])+)?(\/(\d|[A-Z])+)?$/ )
-    {
+   # Possible formats:
+   # JJ1BDX: B = JJ1BDX
+   # JJ1BDX/KL7: B = JJ1BDX / C = KL7
+   # KL7/JJ1BDX/P : two slashes, easy to determine: A = KL7 / B = JJ1BDX / C = P
 
-        # Now $1 holds A (incl /), $3 holds the callsign B and $5 has C
-        # We save them to $a, $b and $c respectively to ensure they won't get
-        # lost in further Regex evaluations.
+    if ( $call =~ /^((\d|[A-Z])+)$/ ) {
+        $a = undef;
+        $b = $1;
+        $c = undef;
+    }
+    elsif ( $call =~ /^((\d|[A-Z])+)\/((\d|[A-Z])+)$/ ) {
+        $a = undef;
+        $b = $1;
+        $c = $3;
+    }
+    elsif ( $call =~ /^((\d|[A-Z])+)\/((\d|[A-Z])+)\/((\d|[A-Z])+)$/ ) {
+        $a = $1;
+        $b = $3;
+        $c = $5;
+    }
+    else {
+        return '';
+    }
 
-        ( $a, $b, $c ) = ( $1, $3, $5 );
-        if ($a) { chop $a }
-        ;    # Remove the / at the end
-        if ($c) { $c = substr( $c, 1, ) }
-        ;    # Remove the / at the beginning
+    # Then how to distinguish KL7/JJ1BDX correctly?
+    # If the first part is a known prefix, then let the part (in B) be A
+    # and let the main callsign (in C) part be B
+    # if not: HEURISTIC: if the first part length is smaller than second part,
+    # the first part is highly likely to be a prefix
 
-     # In some cases when there is no part A but B and C, and C is longer than 2
-     # letters, it happens that $a and $b get the values that $b and $c should
-     # have. This often happens with liddish callsign-additions like /QRP and
-     # /LGT, but also with calls like DJ1YFK/KP5. ~/.yfklog has a line called
-     # "lidadditions", which has QRP and LGT as defaults. This sorts out half of
-     # the problem, but not calls like DJ1YFK/KH5. This is tested in a second
-     # try: $a looks like a call (.\d[A-Z]) and $b doesn't (.\d), they are
-     # swapped. This still does not properly handle calls like DJ1YFK/KH7K where
-     # only the OP's experience says that it's DJ1YFK on KH7K.
+    if ( exists( $prefixes{$b} ) ) {
+        $a = $b;
+        $b = $c;
+        $c = undef;
+    }
+    elsif ( length($b) < length($c) ) {
+        $a = $b;
+        $b = $c;
+        $c = undef;
+    }
 
-        if ( !$c && $a && $b ) {    # $a and $b exist, no $c
-            if ( $b =~ /$lidadditions/ ) {    # check if $b is a lid-addition
-                $b = $a;
-                $a = undef;                   # $a goes to $b, delete lid-add
-            }
-            elsif ( ( $a =~ /\d[A-Z]+$/ ) && ( $b =~ /\d$/ ) )
-            {                                 # check for call in $a
-            }
+    # Remove liddish callsign additions like /QRP and /LGT.
+    if ( defined($c) && ( $c =~ /$lidadditions/ ) )
+    {    # check if $b is a lid-addition
+        $c = undef;
+    }
+
+    # Depending on these values we have to determine the prefix.
+    # Following cases are possible:
+    #
+    # 1.    $a and $c undef --> only callsign, subcases
+    # 1.1   $b contains a number -> everything from start to number
+    # 1.2   $b contains no number -> first two letters plus 0
+    # 2.    $a undef, subcases:
+    # 2.1   $c is only a number -> $a with changed number
+    # 2.2   $c is /P,/M,/MM,/AM -> 1.
+    # 2.3   $c is something else and will be interpreted as a Prefix
+    # 3.    $a is defined, will be taken as PFX, regardless of $c
+
+    if ( ( not defined($a) ) && ( not defined($c) ) ) {    # Case 1
+        if ( $b =~ /\d/ ) {    # Case 1.1, contains number
+            $b =~ /(.+\d)[A-Z]*/;    # Prefix is all but the last
+            $prefix = $1;            # Letters
         }
-
-        # *** Added later ***  The check didn't make sure that the callsign
-        # contains a letter. there are letter-only callsigns like RAEM, but not
-        # figure-only calls.
-
-        if ( $b =~ /^[0-9]+$/ ) {    # Callsign only consists of numbers. Bad!
-            return undef;            # exit, undef
+        else {                       # Case 1.2, no number
+            $prefix = substr( $b, 0, 2 ) . "0";    # first two + 0
         }
+    }
+    elsif ( ( not defined($a) ) && ( defined($c) ) ) {    # Case 2, CALL/X
+        if ( $c =~ /^(\d)$/ ) {                           # Case 2.1, number
+            $b =~ /(.+\d)[A-Z]*/;                         # regular Prefix in $1
+                # Here we need to find out how many digits there are in the
+                # prefix, because for example A45XR/0 is A40. If there are 2
+                # numbers, the first is not deleted. If course in exotic cases
+                # like N66A/7 -> N7 this brings the wrong result of N67, but I
+                # think that's rather irrelevant cos such calls rarely appear
+                # and if they do, it's very unlikely for them to have a number
+                # attached.   You can still edit it by hand anyway..
 
-        # Depending on these values we have to determine the prefix.
-        # Following cases are possible:
-        #
-        # 1.    $a and $c undef --> only callsign, subcases
-        # 1.1   $b contains a number -> everything from start to number
-        # 1.2   $b contains no number -> first two letters plus 0
-        # 2.    $a undef, subcases:
-        # 2.1   $c is only a number -> $a with changed number
-        # 2.2   $c is /P,/M,/MM,/AM -> 1.
-        # 2.3   $c is something else and will be interpreted as a Prefix
-        # 3.    $a is defined, will be taken as PFX, regardless of $c
-
-        if ( ( not defined $a ) && ( not defined $c ) ) {    # Case 1
-            if ( $b =~ /\d/ ) {    # Case 1.1, contains number
-                $b =~ /(.+\d)[A-Z]*/;    # Prefix is all but the last
-                $prefix = $1;            # Letters
+            if ( $1 =~ /^([A-Z]\d)\d$/ ) {    # e.g. A45   $c = 0
+                $prefix = $1 . $c;            # ->   A40
             }
-            else {                       # Case 1.2, no number
-                $prefix = substr( $b, 0, 2 ) . "0";    # first two + 0
-            }
+            else {                            # Otherwise cut all numbers
+                $1 =~ /(.*[A-Z])\d+/;         # Prefix w/o number in $1
+                $prefix = $1 . $c;
+            }    # Add attached number
         }
-        elsif ( ( not defined $a ) && ( defined $c ) ) {    # Case 2, CALL/X
-            if ( $c =~ /^(\d)$/ ) {                         # Case 2.1, number
-                $b =~ /(.+\d)[A-Z]*/;    # regular Prefix in $1
-                  # Here we need to find out how many digits there are in the
-                  # prefix, because for example A45XR/0 is A40. If there are 2
-                  # numbers, the first is not deleted. If course in exotic cases
-                  # like N66A/7 -> N7 this brings the wrong result of N67, but I
-                  # think that's rather irrelevant cos such calls rarely appear
-                  # and if they do, it's very unlikely for them to have a number
-                  # attached.   You can still edit it by hand anyway..
-
-                if ( $1 =~ /^([A-Z]\d)\d$/ ) {    # e.g. A45   $c = 0
-                    $prefix = $1 . $c;            # ->   A40
-                }
-                else {                            # Otherwise cut all numbers
-                    $1 =~ /(.*[A-Z])\d+/;         # Prefix w/o number in $1
-                    $prefix = $1 . $c;
-                }    # Add attached number
-            }
-            elsif ( $c =~ /$csadditions/ ) {
-                $b =~ /(.+\d)[A-Z]*/;    # Known attachment -> like Case 1.1
-                $prefix = $1;
-            }
-            elsif ( $c =~ /^\d\d+$/ ) {    # more than 2 numbers -> ignore
-                $b =~ /(.+\d)[A-Z]*/;      # see above
-                $prefix = $1;
-            }
-            else {                         # Must be a Prefix!
-                if ( $c =~ /\d$/ ) {       # ends in number -> good prefix
-                    $prefix = $c;
-                }
-                else {                     # Add Zero at the end
-                    $prefix = $c . "0";
-                }
-            }
-        }
-        elsif ( defined $a ) {    # $a contains the prefix we want
-            if ( $a =~ /\d$/ ) {    # ends in number -> good prefix
-                $prefix = $a;
-            }
-            else {                  # add zero if no number
-                $prefix = $a . "0";
-            }
-        }
-
-  # In very rare cases (right now I can only think of KH5K and KH7K and FRxG/T
-  # etc), the prefix is wrong, for example KH5K/DJ1YFK would be KH5K0. In this
-  # case, the superfluous part will be cropped. Since this, however, changes the
-  # DXCC of the prefix, this will NOT happen when invoked from with an
-  # extra parameter $_[1]; this will happen when invoking it from &dxcc.
-
-        if ( ( $prefix =~ /(\w+\d)[A-Z]+\d/ ) && ( not defined $_[1] ) ) {
+        elsif ( $c =~ /$csadditions/ ) {
+            $b =~ /(.+\d)[A-Z]*/;    # Known attachment -> like Case 1.1
             $prefix = $1;
         }
-
-        return $prefix;
+        elsif ( $c =~ /^\d\d+$/ ) {    # more than 2 numbers -> ignore
+            $b =~ /(.+\d)[A-Z]*/;      # see above
+            $prefix = $1;
+        }
+        else {                         # Must be a Prefix!
+            if ( $c =~ /\d$/ ) {       # ends in number -> good prefix
+                $prefix = $c;
+            }
+            else {                     # Add Zero at the end
+                $prefix = $c . "0";
+            }
+        }
     }
-    else { return ''; }    # no proper callsign received.
+    elsif ( defined $a ) {    # $a contains the prefix we want
+        if ( $a =~ /\d$/ ) {    # ends in number -> good prefix
+            $prefix = $a;
+        }
+        else {                  # add zero if no number
+            $prefix = $a . "0";
+        }
+    }
+
+    # In very rare cases (right now I can only think of KH5K and KH7K and FRxG/T
+    # etc), the prefix is wrong, for example KH5K/DJ1YFK would be KH5K0. In this
+    # case, the superfluous part will be cropped.
+    if ( $prefix =~ /(\w+\d)[A-Z]+\d/ ) {
+        $prefix = $1;
+    }
+
+    # debug
+    # print "wpx prefix: $prefix\n";
+    return $prefix;
 }    # DxccWpx ends here
 
 ##############################################################################
@@ -276,6 +279,13 @@ sub DxccGetRecord {
     # debug
     #print "testcall: $testcall\n";
 
+    if ( not( $testcall =~ /^((\d|[A-Z]|\/)+)$/ ) ) {
+
+        # debug
+        #print "callsign not legit\n";
+        return @mydxcc;
+    }
+
     if ( $fullcalls{$testcall} ) {    # direct match with a fullcall
             # do nothing! don't try to resolve WPX, it's a full
             # call and will match correctly even if it contains a /
@@ -303,8 +313,7 @@ sub DxccGetRecord {
     }
     elsif ( $testcall =~ /\w\/\w/ ) {    # check if the callsign has a "/"
         $testcall =
-          &DxccWpx( $testcall, 1 )
-          . "AA";                        # use the wpx prefix instead, which may
+          &DxccWpx($testcall) . "AA";    # use the wpx prefix instead, which may
                                          # intentionally be wrong, see &wpx!
     }
 
@@ -333,7 +342,7 @@ sub DxccGetRecord {
         }
     }
 
-    if ( defined( $prefixes{$matchprefix} ) ) {
+    if ( exists( $prefixes{$matchprefix} ) ) {
         @mydxcc = @{ $prefixes{$matchprefix} };
     }
 
