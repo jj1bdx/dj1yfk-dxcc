@@ -1,4 +1,4 @@
-#!/usr/bin/env perl -w
+#!/usr/bin/env perl
 
 # dxcc - determining the DXCC country of a callsign
 # modified by Kenji Rikitake, JJ1BDX.
@@ -23,12 +23,10 @@
 # Boston, MA 02111-1307, USA.
 
 use strict;
+use warnings;
 use POSIX;
 
 my $version   = 'VERSION';
-my $gui       = 0;
-my $earthfile = '';          # world map. location will be found later.
-my $splash    = "                    Please enter a callsign!";
 my $credits   = "dxcc modified by Kenji Rikitake, JJ1BDX.
 See https://github.com/jj1bdx/dj1yfk-dxcc/ for the details.
 (c) 2022 Kenji Rikitake, JJ1BDX 
@@ -46,7 +44,6 @@ the Free Software Foundation; either version 2 of the License, or
 
 my %fullcalls;    # hash of arrays  fullcalls -> dxcc data
 my %prefixes;     # hash of arrays  prefixes -> dxcc data
-my %dxcc;         # hash of arrays  main prefix -> (CQZ, ITUZ, ...)
 my @dxcc;
 
 my $args = '';
@@ -381,17 +378,11 @@ sub DxccReadCty {
             $line =~ /\s+([*A-Za-z0-9\/]+):\s+$/;
             my $mainprefix = $1;
             $line =~ s/\s{2,}//g;
-            @lastdxcc = split( /:/, $line );
-            $dxcc{$mainprefix} = [@lastdxcc];
 
-            # debug
-            #print "mainprefix: $mainprefix\n elements:";
-            #for my $i ( @{ $dxcc{$mainprefix} } ) {
-            #    print " $i, ";
-            #}
-            #print "\n";
+            # Save the current DXCC entry for the Main Prefix
+            @lastdxcc = split( /:/, $line );
         }
-        else {    # prefix-line
+        else {                                   # prefix-line
             $line =~ s/\s+//g;
 
             # split a line into words
@@ -399,21 +390,15 @@ sub DxccReadCty {
             my @words = split( /,|;/, $line );
 
             # debug
-            #print "prefix-line of mainprefix: $mainprefix\n words:";
+            #print "prefix-line of mainprefix: $mainprefix\n";
 
             for my $word (@words) {
 
                 # debug
                 #print "word: $word\n";
 
+                # dxccval may be modified
                 my @dxccval = @lastdxcc;
-
-                # debug
-                #print "dxccval elements:";
-                #for my $i (@dxccval) {
-                #    print " $i, ";
-                #}
-                #print "\n";
 
                 if ( $word =~ /\((\d+)\)/ ) {    # CQ-Zone in ()
                     $dxccval[1] = $1;
