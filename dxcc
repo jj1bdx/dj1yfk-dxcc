@@ -25,9 +25,13 @@
 use strict;
 use warnings;
 use POSIX;
+use File::Basename;
 
-my $version   = 'VERSION';
-my $credits   = "dxcc modified by Kenji Rikitake, JJ1BDX.
+# Where the script resides
+my $scriptdirname = dirname(__FILE__);
+
+my $version = 'VERSION';
+my $credits = "dxcc modified by Kenji Rikitake, JJ1BDX.
 See https://github.com/jj1bdx/dj1yfk-dxcc/ for the details.
 (c) 2022 Kenji Rikitake, JJ1BDX 
 
@@ -83,9 +87,9 @@ else {
 
 ###############################################################################
 #
-# &wpx derives the Prefix following WPX rules from a call. These can be found
-# at: http://www.cq-amateur-radio.com/wpxrules.html
-#  e.g. DJ1YFK/TF3  can be counted as both DJ1 or TF3, but this sub does
+# &DxccWpx derives the Prefix following WPX rules from a call.
+# The rules can be found at: http://www.cq-amateur-radio.com/wpxrules.html
+# e.g. DJ1YFK/TF3  can be counted as both DJ1 or TF3, but this sub does
 # not ask for that, always TF3 (= the attached prefix) is returned. If that is
 # not want the OP wanted, it can still be modified manually.
 #
@@ -226,8 +230,10 @@ sub DxccWpx {
 
 ##############################################################################
 #
-# &dxcc determines the DXCC country of a given callsign using the cty.dat file
-# provided by K1EA at http://www.k1ea.com/cty/cty.dat .
+# &DxccGetRecord determines the DXCC country of a given callsign
+# using the cty.dat country file by
+# Jim Reisert, AD1C (http://country-files.com/).
+#
 # An example entry of the file looks like this:
 #
 # Portugal:                 14:  37:  EU:   39.50:     8.00:     0.0:  CT:
@@ -239,20 +245,23 @@ sub DxccWpx {
 # possible Prefixes and/or whole callsigns that fit for the country, sometimes
 # followed by zones in brackets (WAZ in (), ITU in []).
 #
-# This sub checks the callsign against this list and the DXCC in which
-# the best match (most matching characters) appear. This is needed because for
-# example the CTY file specifies only "D" for Germany, "D4" for Cape Verde.
-# Also some "unusual" callsigns which appear to be in wrong DXCCs will be
-# assigned properly this way, for example Antarctic-Callsigns.
-#
 # First this sub scans the fullcall list for exact matches, which handles the
 # special cases of the callsign.
 # Then the callsign (or what appears to be the part determining the DXCC if
-# there is a "/" in the callsign) will be checked against the list of prefixes
-# and the best matching one will be taken as DXCC.
+# there is a "/" in the callsign) are checked against
+# the list of known prefixes, and the best (longest) matching one
+# is taken as the result.
 #
-# The return-value will be an array ("Country Name", "WAZ", "ITU", "Continent",
-# "latitude", "longitude", "UTC difference", "DXCC").
+# This sub checks the callsign against this list and the DXCC in which
+# the best match (longest matching characters) appear.
+# This is needed because for example
+# the CTY file specifies only "D" for Germany, "D4" for Cape Verde.
+# Also some "unusual" callsigns which appear to be in wrong DXCCs will be
+# assigned properly this way, for example the Antarctic callsigns.
+#
+# The return value is an array contains the following elements:
+# ("Country Name", "WAZ", "ITU", "Continent",
+#   "latitude", "longitude", "UTC difference", "DXCC").
 #
 ###############################################################################
 
@@ -348,10 +357,29 @@ sub DxccGetRecord {
 
 }    # DxccGetRecord ends here
 
+##############################################################################
+#
+# DxccReadCty reads and parses the cty.dat, residing in the following
+# diretories, searching by the following sequence:
+#
+# * /usr/share/dxcc/cty.dat
+# * /usr/local/share/dxcc/cty.dat
+# * <The path where the dxcc script resides>/cty.dat
+#
+# This sub initializes the two hashes used by &DxccGetRecord:
+#
+# * %fullcalls, where the keys are the full callsigns (withOUT the first =),
+#   and the values are the arrays of DxccGetRecord returning values; and
+# * %prefixes, where the keys are the prefixes,
+#   and the values are the arrays of DxccGetRecord returning values.
+#
+##############################################################################
+
 sub DxccReadCty {
 
     # Read cty.dat from AD1C in
-    # /usr/share/dxcc, /usr/local/share/dxcc, and current directory.
+    # /usr/share/dxcc, /usr/local/share/dxcc,
+    # and where the script resides.
 
     my $filename;
 
@@ -361,8 +389,8 @@ sub DxccReadCty {
     elsif ( -e "/usr/local/share/dxcc/cty.dat" ) {
         $filename = "/usr/local/share/dxcc/cty.dat";
     }
-    elsif ( -e "./cty.dat" ) {
-        $filename = "./cty.dat";
+    elsif ( -e "$scriptdirname/cty.dat" ) {
+        $filename = "$scriptdirname/cty.dat";
     }
     else {
         die("Unable to find cty.dat\n");
