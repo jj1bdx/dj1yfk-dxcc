@@ -35,7 +35,7 @@ cty.dat should be installed in one of the following directories:
 
 * /usr/share/dxcc
 * /usr/local/share/dxcc
-* The current directory
+* The directory where the script resides
 
 ## License
 
