@@ -618,7 +618,7 @@ sub DxccGetRecord {
     my $matchprefix = '';
     my $test;
     my $letter = '';
-    my @mydxcc = qw/Unknown 0 0 0 0 0 0 0 0/;
+    my @mydxcc = qw/Unknown 0 0 0 0 0 0 ? 0/;
 
     # debug
     #print "testcall: $testcall\n";
