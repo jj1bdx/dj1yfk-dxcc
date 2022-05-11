@@ -39,5 +39,6 @@ cty.dat should be installed in one of the following directories:
 
 ## License
 
-GPLv2 and later
+* GPLv2 and later
+* cty.dat: MIT License (see cty.dat.copyright.txt)
 
