@@ -618,7 +618,7 @@ sub DxccGetRecord {
     my $matchprefix = '';
     my $test;
     my $letter = '';
-    my @mydxcc = qw/Unknown 0 0 0 0 0 0 ?/;
+    my @mydxcc = qw/Unknown 0 0 0 0 0 0 0 0/;
 
     # debug
     #print "testcall: $testcall\n";
@@ -747,7 +747,6 @@ sub DxccReadCty {
 
         if ( substr( $line, 0, 1 ) ne ' ' ) {    # New DXCC
             $line =~ /\s+([*A-Za-z0-9\/]+):\s+$/;
-            my $mainprefix = $1;
             $line =~ s/\s{2,}//g;
 
             # Save the current DXCC entry for the Main Prefix
@@ -760,9 +759,6 @@ sub DxccReadCty {
             # split a line into words
             # (fullcalls or prefixes with zone amendment data)
             my @words = split( /,|;/, $line );
-
-            # debug
-            #print "prefix-line of mainprefix: $mainprefix\n";
 
             for my $word (@words) {
 
