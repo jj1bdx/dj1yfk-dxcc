@@ -301,16 +301,6 @@ sub DxccGetRecord {
     if ( $testcall =~ /(^OH\/)|(\/OH[1-9]?$)/ ) {    # non-Aland prefix!
         $testcall = "OH";    # make callsign OH = finland
     }
-    elsif ( $testcall =~ /(^3D2R)|(^3D2.+\/R)/ ) {    # seems to be from Rotuma
-        $testcall = "3D2RR";                          # will match with Rotuma
-    }
-    elsif ( $testcall =~ /^3D2C/ ) {    # seems to be from Conway Reef
-        $testcall = "3D2CR";            # will match with Conway
-    }
-    elsif ( $testcall =~ /(^LZ\/)|(\/LZ[1-9]?$)/ )
-    {                                   # LZ/ is LZ0 by DXCC but this is VP8h
-        $testcall = "LZ";
-    }
     elsif ( $testcall =~ /\w\/\w/ ) {    # check if the callsign has a "/"
         $testcall =
           &DxccWpx($testcall) . "AA";    # use the wpx prefix instead, which may
