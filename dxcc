@@ -442,7 +442,7 @@ sub DxccWpx {
     my $b;
     my $c;
     my $call         = $_[0];
-    my $lidadditions = "^QRP\$|^LGT\$";
+    my $lidadditions = "^QRP\$|^LGT\$|^QRPP\$";
     my $csadditions  = "(^P\$)|(^M{1,2}\$)|(^AM\$)|(^A\$)";
 
   # First check if the call is in the proper format, A/B/C where A and C
