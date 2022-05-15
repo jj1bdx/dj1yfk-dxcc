@@ -751,9 +751,28 @@ sub DxccReadCty {
 
             # Save the current DXCC entry for the Main Prefix
             @lastdxcc = split( /:/, $line );
-            push( @lastdxcc, $prefix_to_entitycode{ $lastdxcc[7] } );
+            my $mainprefix = $lastdxcc[7];
+
+            # Rewrite WAE-only prefixes to DXCC prefixes
+            if ( $mainprefix =~ /^\*/ ) {    # WAE country!
+                if ( $mainprefix eq '*TA1' ) { $mainprefix = "TA" }    # Turkey
+                if ( $mainprefix eq '*4U1V' ) {
+                    $mainprefix = "OE";
+                }    # 4U1VIC is in OE..
+                if ( $mainprefix eq '*GM/s' ) { $mainprefix = "GM" } # Shetlands
+                if ( $mainprefix eq '*IG9' ) {
+                    $mainprefix = "I";
+                }    # African Italy
+                if ( $mainprefix eq '*IT9' ) { $mainprefix = "I" }    # Sicily
+                if ( $mainprefix eq '*JW/b' ) {
+                    $mainprefix = "JW";
+                }    # Bear Island
+            }
+
+            # include "/" in the Main Prefix
+            push( @lastdxcc, $prefix_to_entitycode{$mainprefix} );
         }
-        else {                                   # prefix-line
+        else {    # prefix-line
             $line =~ s/\s+//g;
 
             # split a line into words
